@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #define CHUNKSIZE 4096
 #define SAMPLESIZE 4 /* 2 bytes per sample * 2 channels */
@@ -17,9 +18,72 @@ struct stream
   char *buf;
   int fd;
   int bytecount;
+  int readptr;
+  int eof;
+};
+
+struct sa_stream
+{
+  char *buf;
+  int fd;
+  struct stream *stream;
+  int bytecount;
   int samplecount;
   int eof;
 };
+
+/* Read chunk to a struct stream */
+int read_chunk(struct stream *stream)
+{
+  int res;
+
+  stream->bytecount = 0;
+  stream->readptr = 0;
+  while (1) {
+    res = read(stream->fd, &stream->buf[stream->bytecount % CHUNKSIZE],
+	       CHUNKSIZE - stream->bytecount);
+    if (res >= 0) {
+      stream->bytecount += res;
+      if (stream->bytecount == CHUNKSIZE)
+        break;
+      if (res == 0) {
+        stream->eof = 1;
+	break;
+      }
+    }
+    if (res < 0) {
+      if (errno == EAGAIN) /* interrupted system call */
+        continue;
+      else {
+        perror("reading input stream");
+        stream->eof = 1;
+        break;
+      }
+    }
+  }
+  return res;
+}
+
+/* read bytes bytes from input stream */
+/* CHUNK_SIZE must be a multiple of bytes */
+int read_bytes(struct stream *stream, char *buf, int bytes)
+{
+  int res;
+
+  if (stream->bytecount - stream->readptr < bytes) {
+    if (stream->eof)
+      return 0;
+    res = read_chunk(stream);
+    if (res < 0)
+      return res;
+    if (stream->bytecount < bytes) /* must be at end of stream */
+      return 0;
+  }
+  memcpy(buf, &stream->buf[stream->readptr], bytes);
+  stream->readptr += bytes;
+  return bytes;
+}
+  
 
 struct match
 {
@@ -46,64 +110,64 @@ char *sampletime(int sample)
 }
 
 
-int read_sample(struct stream *stream)
+int read_sample(struct sa_stream *sa_stream)
 {
   int res;
   int size = 0;
 
   while (size < SAMPLESIZE) {
-    res = read(stream->fd, stream->buf, SAMPLESIZE);
+    res = read_bytes(sa_stream->stream, sa_stream->buf, SAMPLESIZE);
     if (res < 0)
       return res;
     if (res == 0) {
-      stream->eof = 1;
+      sa_stream->eof = 1;
       break;
     }
     if (res > 0) {
-      stream->bytecount += res;
+      sa_stream->bytecount += res;
       size += res;
     }
   }
   if (size == SAMPLESIZE)
-    stream->samplecount++;
+    sa_stream->samplecount++;
 
   return res;
 }
 
 
-int copy_sample(struct stream *stream)
+int copy_sample(struct sa_stream *sa_stream)
 {
   int size = SAMPLESIZE;
   int res;
 
   while (size) {
-    res = write(stream->fd, stream->buf, size);
+    res = write(sa_stream->fd, sa_stream->buf, size);
     if (res < 0)
       return res;
-    stream->bytecount += res;
+    sa_stream->bytecount += res;
     size -= res;
   }
-  stream->samplecount++;
+  sa_stream->samplecount++;
   return 0;
 }
 
-int discard_sample(struct stream *stream)
+int discard_sample(struct sa_stream *sa_stream)
 {
-  stream->bytecount += SAMPLESIZE;
-  stream->samplecount++;
+  sa_stream->bytecount += SAMPLESIZE;
+  sa_stream->samplecount++;
 
   return 0;
 }
 
 
-int match(struct stream *stream, struct match *what)
+int match(struct sa_stream *sa_stream, struct match *what)
 {
   int size = SAMPLESIZE;
 
-  if (memcmp(stream->buf, what->string, size) == 0) {
+  if (memcmp(sa_stream->buf, what->string, size) == 0) {
     what->matchpoint += size;
     if (what->matchpoint >= what->matchlen) {
-      what->matchsample = stream->samplecount - what->matchlen / SAMPLESIZE;
+      what->matchsample = sa_stream->samplecount - what->matchlen / SAMPLESIZE;
       return 1; /* match */
     }
   } else /* doesn't match */
@@ -133,16 +197,23 @@ int main(int argc, char **argv)
     ++argcount;
   }
 
-  struct stream *input, *output;
+  struct stream *input_low;
 
-  input = malloc(sizeof(struct stream));
-  memset(input, sizeof(struct stream), 0);
+  input_low = malloc(sizeof(struct stream));
+  memset(input_low, sizeof(struct stream), 0);
+  input_low->fd = 0; /* stdin */
+  input_low->buf = malloc(CHUNKSIZE);
+
+  struct sa_stream *input, *output;
+
+  input = malloc(sizeof(struct sa_stream));
+  memset(input, sizeof(struct sa_stream), 0);
 
   input->buf = malloc(SAMPLESIZE);
-  input->fd = 0; /* stdin */
+  input->stream = input_low;
 
-  output = malloc(sizeof(struct stream));
-  memset(output, sizeof(struct stream), 0);
+  output = malloc(sizeof(struct sa_stream));
+  memset(output, sizeof(struct sa_stream), 0);
 
   output->fd = 1; /* stdout */
   output->buf = input->buf;
