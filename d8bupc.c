@@ -52,7 +52,7 @@ int read_chunk(struct stream *stream)
       }
     }
     if (res < 0) {
-      if (errno == EAGAIN) /* interrupted system call */
+      if (errno == EINTR) /* interrupted system call */
         continue;
       else {
         perror("reading input stream");
@@ -62,6 +62,24 @@ int read_chunk(struct stream *stream)
     }
   }
   return res;
+}
+
+int write_chunk(struct stream *stream)
+{
+  int res;
+  int bytecount = 0;
+
+  while (bytecount < stream->bytecount) {
+    res = write(stream->fd, &stream->buf[bytecount],
+                stream->bytecount - bytecount);
+    if (res < 0) {
+      if (errno != EINTR)
+        return res;
+    } else
+      bytecount += res;
+  }
+
+  return bytecount;
 }
 
 /* read bytes bytes from input stream */
