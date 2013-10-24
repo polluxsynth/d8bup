@@ -32,6 +32,8 @@ struct sa_stream
   int eof;
 };
 
+/* stream functions */
+
 /* Read chunk to a struct stream */
 int read_chunk(struct stream *stream)
 {
@@ -101,7 +103,9 @@ int read_bytes(struct stream *stream, char *buf, int bytes)
   stream->readptr += bytes;
   return bytes;
 }
-  
+ 
+
+/* misc structures and functions */ 
 
 struct match
 {
@@ -127,6 +131,7 @@ char *sampletime(int sample)
   return ret;
 }
 
+/* sample stream (sa_stream) functions */
 
 int read_sample(struct sa_stream *sa_stream)
 {
