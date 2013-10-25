@@ -7,6 +7,8 @@
 #define SAMPLESIZE 4 /* 2 bytes per sample * 2 channels */
 #define SAMPLERATE 44100
 
+#define PLURAL(s) ((s) == 1 ? "" : "s")
+
 static const char syncblip_data[] = "\x76\x53\x19\x52"
                                     "\x76\x53\x19\x52"
                                     "\x76\x53\x19\x52"
@@ -131,17 +133,18 @@ struct match
 };
 
 
-char *sampletime(int sample)
+char *sampletime(int samples)
 {
   char *ret = malloc(50);
-  int minutes, seconds, sample_remain = sample;
+  int minutes, seconds, sample_remain = samples;
   
   seconds = sample_remain / SAMPLERATE;
   sample_remain = sample_remain - seconds * SAMPLERATE; /* rimainder */
   minutes = seconds / 60;
   seconds = seconds - minutes * 60;
 
-  sprintf(ret, "sample %d, time %d:%02d", sample, minutes, seconds);
+  sprintf(ret, "%d:%02d (%d sample%s)", minutes, seconds, samples,
+          PLURAL(samples));
 
   return ret;
 }
