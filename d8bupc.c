@@ -221,12 +221,14 @@ int main(int argc, char **argv)
   int argcount = 0;
   int searchpos = -1;
   int start_on_sync = 0;
+  int stop_on_song_end = 0;
   
   while (argcount < argc) {
     if (argv[argcount][0] == '-') {
       switch (argv[argcount][1]) {
         case 's': searchpos = atoi(argv[++argcount]); break;
         case 'm': start_on_sync = 1; break;
+        case 't': start_on_sync = 1; stop_on_song_end = 1; break;
         case 'h': 
 	default: printf("Usage: d8bup [options]\nfilter stdin to stdout\n");
 		 return 0;
@@ -290,7 +292,7 @@ int main(int argc, char **argv)
     if (match(input, syncblip)) {
       fprintf(stderr, "Found syncblip at %s\n", sampletime(syncblip->matchsample));
       syncblips++;
-      if (start_on_sync)
+      if (start_on_sync && syncblips == 1)
         get_started = 1;
       delta = input->samplecount - blipsample;
       if (syncblips >= 4) { /* calculate song length */
@@ -299,6 +301,13 @@ int main(int argc, char **argv)
       }
       fprintf(stderr, "Length of this segment is %s\n", sampletime(delta));
       blipsample = input->samplecount;
+    }
+
+    if (stop_on_song_end && copying && syncblips >= 6 && 
+        input->samplecount == blipsample + song_delta) {
+      fprintf(stderr, "Reached end of song at %s, stopping output\n",
+              sampletime(input->samplecount));
+      copying = 0;
     }
 
     if (get_started && !copying) {
