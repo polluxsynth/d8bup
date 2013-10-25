@@ -269,6 +269,11 @@ int main(int argc, char **argv)
   int done = 0;
   int copying = 0;
   int get_started = 0;
+  int syncblips = 0;
+  int blipsample = 0;
+  int song_delta = 0;
+  int delta = 0;
+
   while (!done)
   {
     int res = read_sample(input);
@@ -284,8 +289,16 @@ int main(int argc, char **argv)
 
     if (match(input, syncblip)) {
       fprintf(stderr, "Found syncblip at %s\n", sampletime(syncblip->matchsample));
+      syncblips++;
       if (start_on_sync)
         get_started = 1;
+      delta = input->samplecount - blipsample;
+      if (syncblips >= 4) { /* calculate song length */
+        if (delta > song_delta)
+          song_delta = delta; /* grab maximum value from all song deltas */
+      }
+      fprintf(stderr, "Length of this segment is %s\n", sampletime(delta));
+      blipsample = input->samplecount;
     }
 
     if (get_started && !copying) {
@@ -304,6 +317,7 @@ int main(int argc, char **argv)
 
   fprintf(stderr, "Read %d bytes, wrote %d bytes\n", input->bytecount, output->bytecount);
   fprintf(stderr, "Read %d samples, wrote %d samples\n", input->samplecount, output->samplecount);
+  fprintf(stderr, "Song length is %s\n", sampletime(song_delta));
 
   
 
