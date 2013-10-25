@@ -18,14 +18,13 @@ struct stream
   char *buf;
   int fd;
   int bytecount;
-  int readptr;
+  int bufptr;
   int eof;
 };
 
 struct sa_stream
 {
   char *buf;
-  int fd;
   struct stream *stream;
   int bytecount;
   int samplecount;
@@ -40,19 +39,10 @@ int read_chunk(struct stream *stream)
   int res;
 
   stream->bytecount = 0;
-  stream->readptr = 0;
+  stream->bufptr = 0;
   while (1) {
-    res = read(stream->fd, &stream->buf[stream->bytecount % CHUNKSIZE],
-	       CHUNKSIZE - stream->bytecount);
-    if (res >= 0) {
-      stream->bytecount += res;
-      if (stream->bytecount == CHUNKSIZE)
-        break;
-      if (res == 0) {
-        stream->eof = 1;
-	break;
-      }
-    }
+    res = read(stream->fd, &stream->buf[stream->bytecount],
+               CHUNKSIZE - stream->bytecount);
     if (res < 0) {
       if (errno == EINTR) /* interrupted system call */
         continue;
@@ -62,6 +52,13 @@ int read_chunk(struct stream *stream)
         break;
       }
     }
+    if (stream->bytecount >= CHUNKSIZE)
+      break;
+    if (res == 0) {
+      stream->eof = 1;
+      break;
+    }
+    stream->bytecount += res;
   }
   return res;
 }
@@ -69,19 +66,19 @@ int read_chunk(struct stream *stream)
 int write_chunk(struct stream *stream)
 {
   int res;
-  int bytecount = 0;
+  int writeptr = 0;
 
-  while (bytecount < stream->bytecount) {
-    res = write(stream->fd, &stream->buf[bytecount],
-                stream->bytecount - bytecount);
+  while (writeptr < stream->bufptr) {
+    res = write(stream->fd, &stream->buf[writeptr], stream->bufptr - writeptr);
     if (res < 0) {
       if (errno != EINTR)
         return res;
     } else
-      bytecount += res;
+      writeptr += res;
   }
 
-  return bytecount;
+  stream->bufptr = 0; /* ready for next chunk */
+  return writeptr;
 }
 
 /* read bytes bytes from input stream */
@@ -90,7 +87,7 @@ int read_bytes(struct stream *stream, char *buf, int bytes)
 {
   int res;
 
-  if (stream->bytecount - stream->readptr < bytes) {
+  if (stream->bytecount - stream->bufptr < bytes) {
     if (stream->eof)
       return 0;
     res = read_chunk(stream);
@@ -99,11 +96,29 @@ int read_bytes(struct stream *stream, char *buf, int bytes)
     if (stream->bytecount < bytes) /* must be at end of stream */
       return 0;
   }
-  memcpy(buf, &stream->buf[stream->readptr], bytes);
-  stream->readptr += bytes;
+  memcpy(buf, &stream->buf[stream->bufptr], bytes);
+  stream->bufptr += bytes;
   return bytes;
 }
- 
+
+/* write bytes to output stream */
+/* CHUNK_SIZE must be a multiple of bytes */
+int write_bytes(struct stream *stream, char *buf, int bytes)
+{
+  memcpy(&stream->buf[stream->bufptr], buf, bytes);
+  stream->bufptr += bytes;
+
+  if (stream->bufptr < CHUNKSIZE)
+    return 0;
+
+  return write_chunk(stream);
+}
+
+/* flush output stream */
+int flush(struct stream *stream)
+{
+  return write_chunk(stream); /* write final chunk */
+}
 
 /* misc structures and functions */ 
 
@@ -160,17 +175,14 @@ int read_sample(struct sa_stream *sa_stream)
 
 int copy_sample(struct sa_stream *sa_stream)
 {
-  int size = SAMPLESIZE;
   int res;
 
-  while (size) {
-    res = write(sa_stream->fd, sa_stream->buf, size);
-    if (res < 0)
-      return res;
-    sa_stream->bytecount += res;
-    size -= res;
-  }
+  res = write_bytes(sa_stream->stream, sa_stream->buf, SAMPLESIZE);
+  if (res < 0)
+    return res;
+  sa_stream->bytecount += res;
   sa_stream->samplecount++;
+
   return 0;
 }
 
@@ -220,12 +232,17 @@ int main(int argc, char **argv)
     ++argcount;
   }
 
-  struct stream *input_low;
+  struct stream *input_low, *output_low;
 
   input_low = malloc(sizeof(struct stream));
   memset(input_low, sizeof(struct stream), 0);
   input_low->fd = 0; /* stdin */
   input_low->buf = malloc(CHUNKSIZE);
+
+  output_low = malloc(sizeof(struct stream));
+  memset(output_low, sizeof(struct stream), 0);
+  output_low->fd = 1; /* stdout */
+  output_low->buf = malloc(CHUNKSIZE);
 
   struct sa_stream *input, *output;
 
@@ -238,8 +255,8 @@ int main(int argc, char **argv)
   output = malloc(sizeof(struct sa_stream));
   memset(output, sizeof(struct sa_stream), 0);
 
-  output->fd = 1; /* stdout */
   output->buf = input->buf;
+  output->stream = output_low;
 
   struct match *syncblip = malloc(sizeof(struct match));
   memset(syncblip, sizeof(struct match), 0);
@@ -278,6 +295,8 @@ int main(int argc, char **argv)
       copy_sample(output);
 
   }
+
+  flush(output->stream); /* write final bytes */
 
 
   fprintf(stderr, "Read %d bytes, wrote %d bytes\n", input->bytecount, output->bytecount);
