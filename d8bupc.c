@@ -9,6 +9,7 @@
 
 #define PLURAL(s) ((s) == 1 ? "" : "s")
 
+#define SYNCBLIPSIZE 4 /* #samples */
 static const char syncblip_data[] = "\x76\x53\x19\x52"
                                     "\x76\x53\x19\x52"
                                     "\x76\x53\x19\x52"
@@ -105,7 +106,7 @@ int read_bytes(struct stream *stream, char *buf, int bytes)
 
 /* write bytes to output stream */
 /* CHUNK_SIZE must be a multiple of bytes */
-int write_bytes(struct stream *stream, char *buf, int bytes)
+int write_bytes(struct stream *stream, const char *buf, int bytes)
 {
   memcpy(&stream->buf[stream->bufptr], buf, bytes);
   stream->bufptr += bytes;
@@ -197,6 +198,24 @@ int discard_sample(struct sa_stream *sa_stream)
   return 0;
 }
 
+int output_samples(struct sa_stream *sa_stream, const char *buf, int samples)
+{
+  int res = write_bytes(sa_stream->stream, buf, samples * SAMPLESIZE);
+  if (res < 0)
+    return res;
+  sa_stream->samplecount += samples;
+  sa_stream->bytecount += samples * SAMPLESIZE;
+}
+  
+
+int silence(struct sa_stream *sa_stream, int samples)
+{
+  const char quiet[4] = "\0\0\0"; /* 4 bytes of zeros */
+
+  while (samples--) {
+    output_samples(sa_stream, quiet, 1);
+  }
+}
 
 int match(struct sa_stream *sa_stream, struct match *what)
 {
@@ -222,12 +241,15 @@ int main(int argc, char **argv)
   int searchpos = -1;
   int start_on_sync = 0;
   int stop_on_song_end = 0;
+  int expand = 0;
   
   while (argcount < argc) {
     if (argv[argcount][0] == '-') {
       switch (argv[argcount][1]) {
         case 's': searchpos = atoi(argv[++argcount]); break;
         case 'm': start_on_sync = 1; break;
+        case 'x': expand = atoi(argv[++argcount]);
+                  start_on_sync = 1; break;
         case 't': start_on_sync = 1; stop_on_song_end = 1; break;
         case 'h': 
 	default: printf("Usage: d8bup [options]\nfilter stdin to stdout\n");
@@ -236,6 +258,11 @@ int main(int argc, char **argv)
     }
     ++argcount;
   }
+  if (expand && expand != 2 && expand != 4 && expand != 6) {
+    fprintf(stderr, "expand requires argument 2, 4 or 6, aborting!\n");
+    exit(1);
+  }
+  expand /= 2; /* 0 (for none), 1, 2 or 3 */
 
   struct stream *input_low, *output_low;
 
@@ -270,7 +297,8 @@ int main(int argc, char **argv)
 
   int done = 0;
   int copying = 0;
-  int get_started = 0;
+  int start_copying = 0;
+  int stop_copying = 0;
   int syncblips = 0;
   int blipsample = 0;
   int song_delta = 0;
@@ -287,19 +315,33 @@ int main(int argc, char **argv)
       break;
     
     if (input->samplecount == searchpos)
-      get_started = 1;
+      start_copying = 1;
 
     if (match(input, syncblip)) {
-      fprintf(stderr, "Found syncblip at %s\n", sampletime(syncblip->matchsample));
       syncblips++;
+
+      fprintf(stderr, "Found syncblip at %s\n", sampletime(syncblip->matchsample));
+
       if (start_on_sync && syncblips == 1)
-        get_started = 1;
+        start_copying = 1;
+
       delta = input->samplecount - blipsample;
+
       if (syncblips >= 4) { /* calculate song length */
         if (delta > song_delta)
           song_delta = delta; /* grab maximum value from all song deltas */
       }
+
+      /* The following can only happen after >= 4 sync blips, so we know
+       * song_delta has been set. */
+      if (expand && syncblips - 3 == expand) {
+        fprintf(stderr, "Will expand with silence and blips from %s\n",
+                sampletime(input->samplecount));
+        stop_copying = 1;
+      }
+
       fprintf(stderr, "Length of this segment is %s\n", sampletime(delta));
+
       blipsample = input->samplecount;
     }
 
@@ -307,19 +349,32 @@ int main(int argc, char **argv)
         input->samplecount == blipsample + song_delta) {
       fprintf(stderr, "Reached end of song at %s, stopping output\n",
               sampletime(input->samplecount));
-      copying = 0;
+      stop_copying = 1;
     }
 
-    if (get_started && !copying) {
+    if (start_copying && !copying) {
       fprintf(stderr, "Copying to output from %s\n", sampletime(input->samplecount));
       copying = 1;
-      get_started = 0;
+      start_copying = 0;
     }
 
     if (copying)
       copy_sample(output);
 
+    if (stop_copying)
+      copying = stop_copying = 0;
   }
+
+  if (expand) expand = 4 - expand; /* output 3, 2 or 1 segment(s) of silence */
+  while (expand--) {
+    fprintf(stderr, "Outputting %s of silence\n", sampletime(song_delta));
+    silence(output, song_delta);
+    if (expand) { /* don't output blip after last expansion */
+      fprintf(stderr, "Outputting sync blip\n");
+      output_samples(output, syncblip_data, SYNCBLIPSIZE);
+    }
+  }
+ 
 
   flush(output->stream); /* write final bytes */
 
