@@ -320,16 +320,18 @@ int main(int argc, char **argv)
     if (match(input, syncblip)) {
       syncblips++;
 
-      fprintf(stderr, "Found syncblip at %s\n", sampletime(syncblip->matchsample));
-
       if (start_on_sync && syncblips == 1)
         start_copying = 1;
 
       delta = input->samplecount - blipsample;
 
+      fprintf(stderr, "Syncblip at %s, segment len is %s\n", 
+              sampletime(syncblip->matchsample),
+              sampletime(delta));
+
       if (syncblips >= 4) { /* calculate song length */
         if (delta > song_delta)
-          song_delta = delta; /* grab maximum value from all song deltas */
+          song_delta = delta; /* grab maximum of all deltas */
       }
 
       /* The following can only happen after >= 4 sync blips, so we know
@@ -339,8 +341,6 @@ int main(int argc, char **argv)
                 sampletime(input->samplecount));
         stop_copying = 1;
       }
-
-      fprintf(stderr, "Length of this segment is %s\n", sampletime(delta));
 
       blipsample = input->samplecount;
     }
