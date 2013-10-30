@@ -15,6 +15,12 @@ static const char syncblip_data[] = "\x76\x53\x19\x52"
                                     "\x76\x53\x19\x52"
                                     "\x76\x53\x19\x52";
 
+#define SYNCTONESIZE 4 /* #samples */
+static const char synctone_data[] = "\x00\x10\x00\x10"
+                                    "\x00\xF0\x00\xF0"
+                                    "\x00\xF0\x00\xF0"
+                                    "\x00\xF0\x00\xF0";
+
 
 struct stream
 {
@@ -299,11 +305,17 @@ int main(int argc, char **argv)
   syncblip->string = syncblip_data;
   syncblip->matchlen = strlen(syncblip_data);
 
+  struct match *synctone = malloc(sizeof(struct match));
+  memset(synctone, sizeof(struct match), 0);
+  synctone->string = synctone_data;
+  synctone->matchlen = SYNCTONESIZE * SAMPLESIZE;
+
   int done = 0;
   int copying = 0;
   int start_copying = 0;
   int stop_copying = 0;
   int syncblips = 0;
+  int synctone_found = 0;
   int blipsample = 0;
   int song_delta = 0;
   int delta = 0;
@@ -321,11 +333,20 @@ int main(int argc, char **argv)
     if (input->samplecount == searchpos)
       start_copying = 1;
 
+    if (!synctone_found && match(input, synctone)) {
+      fprintf(stderr, "Found synctone at %s\n", sampletime(input->samplecount));
+      synctone_found = 1;
+      if (start_on_sync)
+        start_copying = 1;
+    }
+
     if (match(input, syncblip)) {
       syncblips++;
 
+#if 0 /* trigger on syncblip */
       if (start_on_sync && syncblips == 1)
         start_copying = 1;
+#endif
 
       delta = input->samplecount - blipsample;
 
