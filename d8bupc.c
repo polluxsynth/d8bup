@@ -221,14 +221,18 @@ int match(struct sa_stream *sa_stream, struct match *what)
 {
   int size = SAMPLESIZE;
 
-  if (memcmp(sa_stream->buf, what->string, size) == 0) {
+  if (memcmp(sa_stream->buf, &what->string[what->matchpoint], size) == 0) {
     what->matchpoint += size;
     if (what->matchpoint >= what->matchlen) {
       what->matchsample = sa_stream->samplecount - what->matchlen / SAMPLESIZE;
       return 1; /* match */
     }
-  } else /* doesn't match */
-    what->matchpoint = 0; /* start from the beginning of match string */
+  } else { /* doesn't match */
+    if (what->matchpoint != 0) {
+      what->matchpoint = 0; /* start from the beginning of match string */
+      return match(sa_stream, what); /* try from beginning of match string */
+    }
+  }
 
   return 0; /* no match */
 }
