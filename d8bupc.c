@@ -231,6 +231,7 @@ int match(struct sa_stream *sa_stream, struct match *what)
     what->matchpoint += size;
     if (what->matchpoint >= what->matchlen) {
       what->matchsample = sa_stream->samplecount - what->matchlen / SAMPLESIZE;
+      what->matchpoint = 0;
       return 1; /* match */
     }
   } else { /* doesn't match */
