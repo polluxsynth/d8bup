@@ -16,10 +16,10 @@ static const char syncblip_data[] = "\x76\x53\x19\x52"
                                     "\x76\x53\x19\x52";
 
 #define SYNCTONESIZE 4 /* #samples */
-static const char synctone_data[] = "\x00\x10\x00\x10"
-                                    "\x00\xF0\x00\xF0"
-                                    "\x00\xF0\x00\xF0"
-                                    "\x00\xF0\x00\xF0";
+static const char synctone_data[] = "\x00\x00\x00\x00"
+                                    "\x00\x10\x00\x10"
+                                    "\x00\x10\x00\x10"
+                                    "\x00\x10\x00\x10";
 
 
 struct stream
