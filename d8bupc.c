@@ -244,7 +244,16 @@ int match(struct sa_stream *sa_stream, struct match *what)
   return 0; /* no match */
 }
 
-
+int xc_rangecheck(int *arg, const char *what)
+{
+  int val = *arg;
+  if (val && val != 2 && val != 4 && val != 6) {
+    fprintf(stderr, "%s requires argument 2, 4 or 6, aborting!\n", what);
+    return 1;
+  }
+  *arg /= 2; /* 0 (for none), 1, 2 or 3 */
+  return 0;
+}
 
 int main(int argc, char **argv)
 {
@@ -253,6 +262,7 @@ int main(int argc, char **argv)
   int start_on_sync = 0;
   int stop_on_song_end = 0;
   int expand = 0;
+  int cut = 0;
   
   while (argcount < argc) {
     if (argv[argcount][0] == '-') {
@@ -262,18 +272,21 @@ int main(int argc, char **argv)
         case 'x': expand = atoi(argv[++argcount]);
                   start_on_sync = 1; break;
         case 't': start_on_sync = 1; stop_on_song_end = 1; break;
-        case 'h': 
+        case 'c': cut = atoi(argv[++argcount]);
+                  start_on_sync = 1; break;
+        case 'h': /* fall through */
 	default: printf("Usage: d8bup [options]\nfilter stdin to stdout\n");
 		 return 0;
       }
     }
     ++argcount;
   }
-  if (expand && expand != 2 && expand != 4 && expand != 6) {
-    fprintf(stderr, "expand requires argument 2, 4 or 6, aborting!\n");
+  if (expand && cut) {
+    fprintf(stderr, "may only specify one of -x -and -c\n");
     exit(1);
   }
-  expand /= 2; /* 0 (for none), 1, 2 or 3 */
+  if (xc_rangecheck(&expand, "expand (-x)") || xc_rangecheck(&cut, "cut (-c)"))
+    exit(1);
 
   struct stream *input_low, *output_low;
 
@@ -368,6 +381,14 @@ int main(int argc, char **argv)
         stop_copying = 1;
       }
 
+      /* The following can only happen after >= 4 sync blips, so we know
+       * song_delta has been set. */
+      if (cut && syncblips - 3 == cut) {
+        fprintf(stderr, "Cutting input from %s, stopping output\n", 
+                sampletime(input->samplecount));
+        stop_copying = 1;
+      }
+      
       blipsample = input->samplecount;
     }
 
