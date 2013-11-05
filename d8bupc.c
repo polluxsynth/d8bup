@@ -253,6 +253,21 @@ int xc_rangecheck(int *arg, const char *what)
   return 0;
 }
 
+void usage(void)
+{
+  fprintf(stderr, "Usage: d8bup [options]\n"
+                  "Filter D8 backup files from stdin to stdout\n"
+                  "Options:\n"
+                  "-s <sampleno>  Start output on sampleno\n"
+                  "-m             Start output on sync tone\n"
+                  "-t             (Trim) Output from sync tone to end of song\n"
+                  "-x <2, 4 or 6> Expand output from given number of tracks\n"
+                  "-c <2, 4 or 6> Cut output after given number of tracks\n"
+                  "-h             This list\n"
+                  "For -x, -c and -t, output an additional one second of "
+                  "silence at end of file\n");
+}
+
 int main(int argc, char **argv)
 {
   int argcount = 0;
@@ -277,8 +292,7 @@ int main(int argc, char **argv)
                     return 1;
                   start_on_sync = 1; break;
         case 'h': /* fall through */
-	default: printf("Usage: d8bup [options]\nfilter stdin to stdout\n");
-		 return 0;
+	default: usage(); return 0;
       }
     }
     ++argcount;
