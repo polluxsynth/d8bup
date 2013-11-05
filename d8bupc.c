@@ -247,7 +247,7 @@ int match(struct sa_stream *sa_stream, struct match *what)
 int xc_rangecheck(int *arg, const char *what)
 {
   int val = *arg;
-  if (val && val != 2 && val != 4 && val != 6) {
+  if (val != 2 && val != 4 && val != 6) {
     fprintf(stderr, "%s requires argument 2, 4 or 6, aborting!\n", what);
     return 1;
   }
@@ -270,9 +270,13 @@ int main(int argc, char **argv)
         case 's': searchpos = atoi(argv[++argcount]); break;
         case 'm': start_on_sync = 1; break;
         case 'x': expand = atoi(argv[++argcount]);
+                  if (xc_rangecheck(&expand, "expand (-x)"))
+                    return 1;
                   start_on_sync = 1; break;
         case 't': start_on_sync = 1; stop_on_song_end = 1; break;
         case 'c': cut = atoi(argv[++argcount]);
+                  if (xc_rangecheck(&cut, "cut (-c)"))
+                    return 1;
                   start_on_sync = 1; break;
         case 'h': /* fall through */
 	default: printf("Usage: d8bup [options]\nfilter stdin to stdout\n");
@@ -285,8 +289,6 @@ int main(int argc, char **argv)
     fprintf(stderr, "may only specify one of -x -and -c\n");
     exit(1);
   }
-  if (xc_rangecheck(&expand, "expand (-x)") || xc_rangecheck(&cut, "cut (-c)"))
-    exit(1);
 
   struct stream *input_low, *output_low;
 
