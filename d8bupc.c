@@ -6,6 +6,7 @@
 #define CHUNKSIZE 4096
 #define SAMPLESIZE 4 /* 2 bytes per sample * 2 channels */
 #define SAMPLERATE 44100
+#define ONE_SECOND SAMPLERATE
 
 #define PLURAL(s) ((s) == 1 ? "" : "s")
 
@@ -423,7 +424,10 @@ int main(int argc, char **argv)
       output_samples(output, syncblip_data, SYNCBLIPSIZE);
     }
   }
- 
+
+  if (expand || cut || stop_on_song_end)
+    silence(output, ONE_SECOND);
+
 
   flush(output->stream); /* write final bytes */
 
