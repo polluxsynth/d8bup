@@ -140,7 +140,6 @@ struct match
   int matchsample; /* which sample is at the start of the match */
 };
 
-
 char *sampletime(int samples)
 {
   char *ret = malloc(50);
@@ -183,7 +182,6 @@ int read_sample(struct sa_stream *sa_stream)
   return res;
 }
 
-
 int copy_sample(struct sa_stream *sa_stream)
 {
   int res;
@@ -214,7 +212,6 @@ int output_samples(struct sa_stream *sa_stream, const char *buf, int samples)
   sa_stream->bytecount += samples * SAMPLESIZE;
 }
   
-
 int silence(struct sa_stream *sa_stream, int samples)
 {
   const char quiet[4] = "\0\0\0"; /* 4 bytes of zeros */
@@ -428,16 +425,11 @@ int main(int argc, char **argv)
   if (expand || cut || stop_on_song_end)
     silence(output, ONE_SECOND);
 
-
   flush(output->stream); /* write final bytes */
-
 
   fprintf(stderr, "Read %d bytes, wrote %d bytes\n", input->bytecount, output->bytecount);
   fprintf(stderr, "Read %d samples, wrote %d samples\n", input->samplecount, output->samplecount);
   fprintf(stderr, "Song length is %s\n", sampletime(song_delta));
-
-  
-
 
   return 0;
 }
