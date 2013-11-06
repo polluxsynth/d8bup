@@ -364,8 +364,12 @@ int main(int argc, char **argv)
     if (!synctone_found && match(input, synctone)) {
       fprintf(stderr, "Found synctone at %s\n", sampletime(input->samplecount));
       synctone_found = 1;
-      if (start_on_sync)
+      if (start_on_sync) {
+        silence(output, ONE_SECOND);
+        /* restore part of sync tone that will be skipped due to matching */
+        output_samples(output, synctone_data, SYNCTONESIZE-1);
         start_copying = 1;
+      }
     }
 
     if (match(input, syncblip)) {
