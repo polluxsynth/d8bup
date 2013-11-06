@@ -263,6 +263,7 @@ void usage(void)
                   "-t             (Trim) Output from sync tone to end of song\n"
                   "-x <2, 4 or 6> Expand output from given number of tracks\n"
                   "-c <2, 4 or 6> Cut output after given number of tracks\n"
+                  "-b             Break input: exit after ending output\n"
                   "-h             This list\n"
                   "For -x, -c and -t, output an additional one second of "
                   "silence at end of file\n");
@@ -276,6 +277,7 @@ int main(int argc, char **argv)
   int stop_on_song_end = 0; /* set for -t only */
   int expand = 0; /* !=0 when -x encountered */
   int cut = 0; /* !=0 when -c encountered */
+  int break_input = 0; /* set for -b mode */
   
   while (argcount < argc) {
     if (argv[argcount][0] == '-') {
@@ -291,6 +293,7 @@ int main(int argc, char **argv)
                   if (xc_rangecheck(&cut, "cut (-c)"))
                     return 1;
                   start_on_sync = 1; break;
+        case 'b': break_input = 1; break;
         case 'h': /* fall through */
 	default: usage(); return 0;
       }
@@ -426,8 +429,11 @@ int main(int argc, char **argv)
     if (copying)
       copy_sample(output);
 
-    if (stop_copying)
+    if (stop_copying) {
       copying = stop_copying = 0;
+      if (break_input)
+        break; /* don't consume any more input bytes */
+    }
   }
 
   if (expand) expand = 4 - expand; /* output 3, 2 or 1 segment(s) of silence */
