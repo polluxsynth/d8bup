@@ -270,12 +270,12 @@ void usage(void)
 
 int main(int argc, char **argv)
 {
-  int argcount = 0;
-  int searchpos = -1;
-  int start_on_sync = 0;
-  int stop_on_song_end = 0;
-  int expand = 0;
-  int cut = 0;
+  int argcount = 0; /* command line argument count */
+  int searchpos = -1; /* set to search position when -s encountered */
+  int start_on_sync = 0; /* set in all modes where we start on sync tone */
+  int stop_on_song_end = 0; /* set for -t only */
+  int expand = 0; /* !=0 when -x encountered */
+  int cut = 0; /* !=0 when -c encountered */
   
   while (argcount < argc) {
     if (argv[argcount][0] == '-') {
@@ -338,15 +338,15 @@ int main(int argc, char **argv)
   synctone->string = synctone_data;
   synctone->matchlen = SYNCTONESIZE * SAMPLESIZE;
 
-  int done = 0;
-  int copying = 0;
-  int start_copying = 0;
-  int stop_copying = 0;
-  int syncblips = 0;
-  int synctone_found = 0;
-  int blipsample = 0;
-  int song_delta = 0;
-  int delta = 0;
+  int done = 0; /* looping condition */
+  int copying = 0; /* copying data from input to output stream */
+  int start_copying = 0; /* trigger to start copying; reset once started */
+  int stop_copying = 0; /* trigger to stop copying; reset once done */
+  int syncblips = 0; /* # sync blips found in in put stream */
+  int synctone_found = 0; /* set to 1 once sync tone found, and never reset */
+  int blipsample = 0; /* sample no of latest sync blip */
+  int song_delta = 0; /* length of song in samples */
+  int delta = 0; /* distance between two previous syncblips */
 
   while (!done)
   {
