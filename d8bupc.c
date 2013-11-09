@@ -8,7 +8,13 @@
 #define SAMPLERATE 44100
 #define ONE_SECOND SAMPLERATE
 
+#define NAMELEN 16 /* length of D8 name string */
+#define NAME_OFFSET 11 /* #samples from 1. syncblip */
+
 #define PLURAL(s) ((s) == 1 ? "" : "s")
+
+/* Global debugging */
+#define D(x)
 
 #define SYNCBLIPSIZE 4 /* #samples */
 static const char syncblip_data[] = "\x76\x53\x19\x52"
@@ -21,6 +27,11 @@ static const char synctone_data[] = "\x00\x00\x00\x00"
                                     "\x00\x10\x00\x10"
                                     "\x00\x10\x00\x10"
                                     "\x00\x10\x00\x10";
+
+/* Scheme for how to extract name: for each stereo sample of 4
+ * (i.e. SAMPLESIZE) bytes, extract byte #1 and byte #0 (i.e.
+ * left channel, byte swapped), then wait for next sample */
+static const how_name[] = { 1, 0, -1 };
 
 
 struct stream
@@ -242,6 +253,43 @@ int match(struct sa_stream *sa_stream, struct match *what)
   return 0; /* no match */
 }
 
+struct extractor
+{
+  int length;
+  int bytecount;
+  int start_sample;
+  int skip_first;
+  const int *how;
+  char *string;
+};
+
+int extract(struct sa_stream *input, struct extractor *extractor)
+{
+  int byteno;
+
+  if (input->samplecount < extractor->start_sample) /* not yet there */
+    return 0;
+
+  if (extractor->bytecount >= extractor->length)
+    return 1;
+
+  for (byteno = 0; byteno < SAMPLESIZE; byteno++) {
+    if (extractor->how[byteno] < 0) break; /* end of extractor string */
+    if (extractor->bytecount == 0) { /* no copying started yet */
+      if (byteno < extractor->skip_first)
+        continue; /* skip skip_first bytes at start */
+    }
+    extractor->string[extractor->bytecount++] = 
+      input->buf[extractor->how[byteno]];
+    D(fprintf(stderr, "extract: sampleno %d, byteno %d, data %d\n", input->samplecount, byteno, input->buf[extractor->how[byteno]]));
+    if (extractor->bytecount >= extractor->length) {
+      extractor->string[extractor->bytecount] = '\0'; /* terminate it */
+      return 1; /* all copied */
+    }
+  }
+  return 0;
+}
+
 int xc_rangecheck(int *arg, const char *what)
 {
   int val = *arg;
@@ -341,6 +389,14 @@ int main(int argc, char **argv)
   synctone->string = synctone_data;
   synctone->matchlen = SYNCTONESIZE * SAMPLESIZE;
 
+  struct extractor *extract_name = malloc(sizeof(struct extractor));
+  memset(extract_name, sizeof(struct extractor), 0);
+  extract_name->length = NAMELEN;
+  extract_name->string = malloc(NAMELEN + 1);
+  extract_name->how = how_name;
+  extract_name->skip_first = 1; /* skip 1 byte in first sample */
+  extract_name->start_sample = -1; /* not yet started */
+
   int done = 0; /* looping condition */
   int copying = 0; /* copying data from input to output stream */
   int start_copying = 0; /* trigger to start copying; reset once started */
@@ -350,6 +406,7 @@ int main(int argc, char **argv)
   int blipsample = 0; /* sample no of latest sync blip */
   int song_delta = 0; /* length of song in samples */
   int delta = 0; /* distance between two previous syncblips */
+  int found_name = 0; /* name string found */
 
   while (!done)
   {
@@ -375,13 +432,20 @@ int main(int argc, char **argv)
       }
     }
 
-    if (match(input, syncblip)) {
+    if (!found_name && syncblips == 1 && extract(input, extract_name)) {
+      fprintf(stderr, "Song name: \"%s\"\n", extract_name->string);
+      found_name = 1;
+    }
+
+    if (match(input, syncblip)) { /* Found a syncblip */
       syncblips++;
 
 #if 0 /* trigger on syncblip */
       if (start_on_sync && syncblips == 1)
         start_copying = 1;
 #endif
+      if (syncblips == 1)
+        extract_name->start_sample = input->samplecount + NAME_OFFSET;
 
       delta = input->samplecount - blipsample;
 
