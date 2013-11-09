@@ -132,14 +132,6 @@ int flush(struct stream *stream)
 
 /* misc structures and functions */ 
 
-struct match
-{
-  const char *string;
-  int matchlen; /* length of string */
-  int matchpoint; /* next point to match */
-  int matchsample; /* which sample is at the start of the match */
-};
-
 char *sampletime(int samples)
 {
   char *ret = malloc(50);
@@ -220,6 +212,14 @@ int silence(struct sa_stream *sa_stream, int samples)
     output_samples(sa_stream, quiet, 1);
   }
 }
+
+struct match
+{
+  const char *string;
+  int matchlen; /* length of string */
+  int matchpoint; /* next point to match */
+  int matchsample; /* which sample is at the start of the match */
+};
 
 int match(struct sa_stream *sa_stream, struct match *what)
 {
