@@ -334,6 +334,7 @@ void usage(void)
                   "-x <2, 4 or 6> Expand output from given number of tracks\n"
                   "-c <2, 4 or 6> Cut output after given number of tracks\n"
                   "-b             Break input: exit after ending output\n"
+                  "-n             Output name to stdout, then exit\n"
                   "-h             This list\n"
                   "For -x, -c and -t, output an additional one second of "
                   "silence at end of file\n");
@@ -348,6 +349,7 @@ int main(int argc, char **argv)
   int expand = 0; /* !=0 when -x encountered */
   int cut = 0; /* !=0 when -c encountered */
   int break_input = 0; /* set for -b mode */
+  int name_only = 0; /* set for -n; output name then exit */
   
   while (argcount < argc) {
     if (argv[argcount][0] == '-') {
@@ -364,6 +366,7 @@ int main(int argc, char **argv)
                     return 1;
                   start_on_sync = 1; break;
         case 'b': break_input = 1; break;
+        case 'n': name_only = 1; break;
         case 'h': /* fall through */
 	default: usage(); return 0;
       }
@@ -458,6 +461,10 @@ int main(int argc, char **argv)
       const char *name = trim_space(extract_name->string);
       fprintf(stderr, "Song name: \"%s\"\n", name);
       found_name = 1;
+      if (name_only) {
+        printf("%s\n", name);
+        done = 1;
+      }
     }
 
     if (match(input, syncblip)) { /* Found a syncblip */
@@ -522,6 +529,9 @@ int main(int argc, char **argv)
         break; /* don't consume any more input bytes */
     }
   }
+
+  if (name_only)
+    return 0;
 
   if (expand) expand = 4 - expand; /* output 3, 2 or 1 segment(s) of silence */
   while (expand--) {
