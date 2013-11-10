@@ -290,6 +290,28 @@ int extract(struct sa_stream *input, struct extractor *extractor)
   return 0;
 }
 
+/* trim spaces from end of string */
+char *trim_space(char *s)
+{
+  int len = strlen(s);
+
+  if (!len) return s; /* string has zero length, we're done */
+
+  /* trim spaces from end of string */
+  char *s_end = s + len;
+  while (s_end-- > s) {
+    if (*s_end != ' ')
+      break;
+  }
+  s_end[1] = '\0';
+
+  /* trim spaces from start */
+  while (*s == ' ')
+    s++;
+
+  return s;
+}
+
 int xc_rangecheck(int *arg, const char *what)
 {
   int val = *arg;
@@ -433,7 +455,8 @@ int main(int argc, char **argv)
     }
 
     if (!found_name && syncblips == 1 && extract(input, extract_name)) {
-      fprintf(stderr, "Song name: \"%s\"\n", extract_name->string);
+      const char *name = trim_space(extract_name->string);
+      fprintf(stderr, "Song name: \"%s\"\n", name);
       found_name = 1;
     }
 
