@@ -53,6 +53,7 @@ run_test 1 "pass through using -t" "./d8bupc -t" 12345678.raw passthru.raw
 run_test 2 "cut using -c" "./d8bupc -c 2" 12345678.raw truncated.raw
 cp result.raw test.raw
 run_test 3 "expand using -x" "./d8bupc -x 2" test.raw expanded.raw
+run_test 4 "extract name using -n" "./d8bupc -n" 12345678.raw 12345678.txt
 
 if [ "$FAILED" ]; then
   echo "Something FAILED!" | log_and_print
