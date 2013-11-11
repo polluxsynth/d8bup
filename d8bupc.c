@@ -281,7 +281,7 @@ int extract(struct sa_stream *input, struct extractor *extractor)
     }
     extractor->string[extractor->bytecount++] = 
       input->buf[extractor->how[byteno]];
-    D(fprintf(stderr, "extract: sampleno %d, byteno %d, data %d\n", input->samplecount, byteno, input->buf[extractor->how[byteno]]));
+    D(fprintf(stderr, "\nextract: sampleno %d, byteno %d, data %d", input->samplecount, byteno, input->buf[extractor->how[byteno]]));
     if (extractor->bytecount >= extractor->length) {
       extractor->string[extractor->bytecount] = '\0'; /* terminate it */
       return 1; /* all copied */
@@ -447,7 +447,7 @@ int main(int argc, char **argv)
       start_copying = 1;
 
     if (!synctone_found && match(input, synctone)) {
-      fprintf(stderr, "Found synctone at %s\n", sampletime(input->samplecount));
+      fprintf(stderr, "\nFound synctone at %s", sampletime(input->samplecount));
       synctone_found = 1;
       if (start_on_sync) {
         silence(output, ONE_SECOND);
@@ -459,7 +459,7 @@ int main(int argc, char **argv)
 
     if (!found_name && syncblips == 1 && extract(input, extract_name)) {
       const char *name = trim_space(extract_name->string);
-      fprintf(stderr, "Song name: \"%s\"\n", name);
+      fprintf(stderr, "\nSong name: \"%s\"", name);
       found_name = 1;
       if (name_only) {
         printf("%s\n", name);
@@ -479,7 +479,7 @@ int main(int argc, char **argv)
 
       delta = input->samplecount - blipsample;
 
-      fprintf(stderr, "Syncblip at %s, segment len is %s\n", 
+      fprintf(stderr, "\nSyncblip at %s, segment length is %s", 
               sampletime(syncblip->matchsample),
               sampletime(delta));
 
@@ -491,7 +491,7 @@ int main(int argc, char **argv)
       /* The following can only happen after >= 4 sync blips, so we know
        * song_delta has been set. */
       if (expand && syncblips - 3 == expand) {
-        fprintf(stderr, "Will expand with silence and blips from %s\n",
+        fprintf(stderr, "\nWill expand with silence and blips from %s",
                 sampletime(input->samplecount));
         stop_copying = 1;
       }
@@ -499,7 +499,7 @@ int main(int argc, char **argv)
       /* The following can only happen after >= 4 sync blips, so we know
        * song_delta has been set. */
       if (cut && syncblips - 3 == cut) {
-        fprintf(stderr, "Cutting input from %s, stopping output\n", 
+        fprintf(stderr, "\nCutting input from %s, stopping output", 
                 sampletime(input->samplecount));
         stop_copying = 1;
       }
@@ -509,13 +509,13 @@ int main(int argc, char **argv)
 
     if (stop_on_song_end && copying && syncblips >= 6 && 
         input->samplecount == blipsample + song_delta) {
-      fprintf(stderr, "Reached end of song at %s, stopping output\n",
+      fprintf(stderr, "\nReached end of song at %s, stopping output",
               sampletime(input->samplecount));
       stop_copying = 1;
     }
 
     if (start_copying && !copying) {
-      fprintf(stderr, "Copying to output from %s\n", sampletime(input->samplecount));
+      fprintf(stderr, "\nCopying to output from %s", sampletime(input->samplecount));
       copying = 1;
       start_copying = 0;
     }
@@ -531,14 +531,14 @@ int main(int argc, char **argv)
   }
 
   if (name_only)
-    return 0;
+    goto exit_ok;
 
   if (expand) expand = 4 - expand; /* output 3, 2 or 1 segment(s) of silence */
   while (expand--) {
-    fprintf(stderr, "Outputting %s of silence\n", sampletime(song_delta));
+    fprintf(stderr, "\nOutputting %s of silence", sampletime(song_delta));
     silence(output, song_delta);
     if (expand) { /* don't output blip after last expansion */
-      fprintf(stderr, "Outputting sync blip\n");
+      fprintf(stderr, "\nOutputting sync blip");
       output_samples(output, syncblip_data, SYNCBLIPSIZE);
     }
   }
@@ -548,9 +548,11 @@ int main(int argc, char **argv)
 
   flush(output->stream); /* write final bytes */
 
-  fprintf(stderr, "Read %d bytes, wrote %d bytes\n", input->bytecount, output->bytecount);
-  fprintf(stderr, "Read %d samples, wrote %d samples\n", input->samplecount, output->samplecount);
-  fprintf(stderr, "Song length is %s\n", sampletime(song_delta));
+  fprintf(stderr, "\nRead %d bytes, wrote %d bytes", input->bytecount, output->bytecount);
+  fprintf(stderr, "\nRead %d samples, wrote %d samples", input->samplecount, output->samplecount);
+  fprintf(stderr, "\nSong length is %s", sampletime(song_delta));
 
+exit_ok:
+  fprintf(stderr, "\n");
   return 0;
 }
