@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #define CHUNKSIZE 4096
 #define SAMPLESIZE 4 /* 2 bytes per sample * 2 channels */
@@ -335,6 +338,7 @@ void usage(void)
                   "-c <2, 4 or 6> Cut output after given number of tracks\n"
                   "-z             Don't break input: read input until eof\n"
                   "-n             Output name to stdout, then exit\n"
+                  "-o <filename>  Use specified filename instead of stdout\n"
                   "-h             This list\n"
                   "For -x, -c and -t, output an additional one second of "
                   "silence at end of file\n");
@@ -350,6 +354,8 @@ int main(int argc, char **argv)
   int cut = 0; /* !=0 when -c encountered */
   int dont_break_input = 0; /* set for -z mode */
   int name_only = 0; /* set for -n; output name then exit */
+  char *filename = NULL; /* use specified file name instead of stdout */
+  int output_fd = 1; /* default to stdout */
   
   while (argcount < argc) {
     if (argv[argcount][0] == '-') {
@@ -367,6 +373,7 @@ int main(int argc, char **argv)
                   start_on_sync = 1; break;
         case 'z': dont_break_input = 1; break;
         case 'n': name_only = 1; break;
+        case 'o': filename = argv[++argcount]; break;
         case 'h': /* fall through */
 	default: usage(); return 0;
       }
@@ -378,6 +385,15 @@ int main(int argc, char **argv)
     exit(1);
   }
 
+  if (filename) {
+    output_fd = open(filename, O_CREAT | O_EXCL | O_WRONLY, 
+                     S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    if (output_fd < 0) {
+      perror("Creating output file");
+      exit(1);
+    }
+  }
+
   struct stream *input_low, *output_low;
 
   input_low = malloc(sizeof(struct stream));
@@ -387,7 +403,7 @@ int main(int argc, char **argv)
 
   output_low = malloc(sizeof(struct stream));
   memset(output_low, sizeof(struct stream), 0);
-  output_low->fd = 1; /* stdout */
+  output_low->fd = output_fd; /* default stdout */
   output_low->buf = malloc(CHUNKSIZE);
 
   struct sa_stream *input, *output;
