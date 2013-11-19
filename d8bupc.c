@@ -36,6 +36,7 @@ static const char synctone_data[] = "\x00\x00\x00\x00"
  * left channel, byte swapped), then wait for next sample */
 static const how_name[] = { 1, 0, -1 };
 
+static const char *tempfilename = "d8bup.tmp.raw";
 
 struct stream
 {
@@ -293,6 +294,34 @@ int extract(struct sa_stream *input, struct extractor *extractor)
   return 0;
 }
 
+/* Make output file name from song name, considering cut (-c) option */
+char *make_filename(const char *songname, int cut)
+{
+  static char filename[NAMELEN + 4 + 4 + 4 + 1];
+                     /*          cut var ext nul */
+                     /* e.g.    -4tr -1  .raw    */
+
+  /* assert(strlen(songname) <= NAMELEN); */
+  strncpy(filename, songname, NAMELEN);
+  if (cut)
+    sprintf(filename + strlen(filename), "-%dtr", cut * 2);
+
+  int name_end = strlen(filename);
+  int var = 0;
+
+  /* loop until a unique name found */
+  while (1) {
+     strcat(filename, ".raw");
+     int try_fd = open(filename, O_RDONLY);
+     if (try_fd < 0)
+       break; /* file doesn't exist, so we're happy */
+     close(try_fd);
+     sprintf(filename + name_end, "-%d", ++var);
+  }
+
+  return filename;
+}
+
 /* trim spaces from end of string */
 char *trim_space(char *s)
 {
@@ -354,7 +383,8 @@ int main(int argc, char **argv)
   int cut = 0; /* !=0 when -c encountered */
   int dont_break_input = 0; /* set for -z mode */
   int name_only = 0; /* set for -n; output name then exit */
-  char *filename = NULL; /* use specified file name instead of stdout */
+  int songname_as_filename = 0; /* set for -f */
+  const char *filename = NULL; /* use specified file name instead of stdout */
   int output_fd = 1; /* default to stdout */
   
   while (argcount < argc) {
@@ -374,6 +404,7 @@ int main(int argc, char **argv)
         case 'z': dont_break_input = 1; break;
         case 'n': name_only = 1; break;
         case 'o': filename = argv[++argcount]; break;
+        case 'f': songname_as_filename = 1; break;
         case 'h': /* fall through */
 	default: usage(); return 0;
       }
@@ -384,6 +415,14 @@ int main(int argc, char **argv)
     fprintf(stderr, "may only specify one of -x -and -c\n");
     exit(1);
   }
+
+  if (filename && songname_as_filename) {
+    fprintf(stderr, "may only specify one of -f and -o\n");
+    exit(1);
+  }
+
+  if (songname_as_filename)
+    filename = tempfilename;
 
   if (filename) {
     output_fd = open(filename, O_CREAT | O_EXCL | O_WRONLY, 
@@ -448,7 +487,7 @@ int main(int argc, char **argv)
   int song_delta = 0; /* length of song in samples */
   int delta = 0; /* distance between two previous syncblips */
   int found_name = 0; /* name string found */
-  const char *song_name = NULL;
+  const char *songname = NULL;
 
   while (!done)
   {
@@ -475,12 +514,16 @@ int main(int argc, char **argv)
     }
 
     if (!found_name && syncblips == 1 && extract(input, extract_name)) {
-      song_name = trim_space(extract_name->string);
-      fprintf(stderr, "\nSong name: \"%s\"", song_name);
+      songname = trim_space(extract_name->string);
+      fprintf(stderr, "\nSong name: \"%s\"", songname);
       found_name = 1;
       if (name_only) {
-        printf("%s\n", song_name);
+        printf("%s\n", songname);
         done = 1;
+      }
+      if (songname_as_filename) {
+        filename = make_filename(songname, cut);
+        fprintf(stderr, "\nWill use output file name %s", filename);
       }
     }
 
@@ -564,6 +607,11 @@ int main(int argc, char **argv)
     silence(output, ONE_SECOND);
 
   flush(output->stream); /* write final bytes */
+
+  if (songname_as_filename) {
+    if (rename(tempfilename, filename) < 0)
+      perror("Renaming output file");
+  }
 
   fprintf(stderr, "\nRead %d bytes, wrote %d bytes", input->bytecount, output->bytecount);
   fprintf(stderr, "\nRead %d samples, wrote %d samples", input->samplecount, output->samplecount);
