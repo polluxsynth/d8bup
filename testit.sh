@@ -25,12 +25,18 @@ run_test() {
   testname=$1
   testdescr=$2
   command=$3
-  infile=$4
-  reffile=$5
+  tofile=$4 # 0 use stdout, 1 use -o <filename>, 2 use song name
+  infile=$5
+  reffile=$6
   testfile=result.raw
+  rm -f $testfile
   echo "Test $testname: $testdescr" | log_and_print
   echo "Running $command" | log
-  $command < $infile > $testfile 2>> $LOGFILE
+  if [ $tofile = 1 ]; then
+    $command -o $testfile < $infile 2>> $LOGFILE
+  else
+    $command < $infile > $testfile 2>> $LOGFILE
+  fi
   echo "Comparing result" | log
   cmp -b $testfile $reffile 2>&1 >> $LOGFILE 
   if [ $? -eq 0 ]; then
@@ -49,11 +55,12 @@ echo "First create raw files" | log_and_print
 
 makeraw 12345678.wav passthru.wav truncated.wav expanded.wav
 
-run_test 1 "pass through using -t" "./d8bupc -t" 12345678.raw passthru.raw
-run_test 2 "cut using -c" "./d8bupc -c 2" 12345678.raw truncated.raw
+run_test 1 "pass through using -t" "./d8bupc -t" 0 12345678.raw passthru.raw
+run_test 2 "cut using -c" "./d8bupc -c 2" 0 12345678.raw truncated.raw
 cp result.raw test.raw
-run_test 3 "expand using -x" "./d8bupc -x 2" test.raw expanded.raw
-run_test 4 "extract name using -n" "./d8bupc -n" 12345678.raw 12345678.txt
+run_test 3 "expand using -x" "./d8bupc -x 2" 0 test.raw expanded.raw
+run_test 4 "extract name using -n" "./d8bupc -n" 0 12345678.raw 12345678.txt
+run_test 5 "write to file" "./d8bupc -t" 1 12345678.raw passthru.raw
 
 if [ "$FAILED" ]; then
   echo "Something FAILED!" | log_and_print
