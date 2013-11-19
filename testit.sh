@@ -29,11 +29,22 @@ run_test() {
   infile=$5
   reffile=$6
   testfile=result.raw
+  if [ $tofile = 2 ]; then
+    # Extract song name and use as base name for output file.
+    # Since song name is "12345678" and our input file is normally 12345678.raw,
+    # expect to use 12345678-1.raw .
+    testfile=$infile
+    if [ -f $testfile ]; then
+      testfile=$(basename $testfile .raw)-1.raw
+    fi
+  fi
   rm -f $testfile
   echo "Test $testname: $testdescr" | log_and_print
   echo "Running $command" | log
   if [ $tofile = 1 ]; then
     $command -o $testfile < $infile 2>> $LOGFILE
+  elif [ $tofile = 2 ]; then
+    $command -f < $infile 2>> $LOGFILE
   else
     $command < $infile > $testfile 2>> $LOGFILE
   fi
@@ -61,6 +72,7 @@ cp result.raw test.raw
 run_test 3 "expand using -x" "./d8bupc -x 2" 0 test.raw expanded.raw
 run_test 4 "extract name using -n" "./d8bupc -n" 0 12345678.raw 12345678.txt
 run_test 5 "write to file" "./d8bupc -t" 1 12345678.raw passthru.raw
+run_test 6 "write to songname" "./d8bupc -t" 2 12345678.raw passthru.raw
 
 if [ "$FAILED" ]; then
   echo "Something FAILED!" | log_and_print
