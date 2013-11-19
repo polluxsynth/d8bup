@@ -448,6 +448,7 @@ int main(int argc, char **argv)
   int song_delta = 0; /* length of song in samples */
   int delta = 0; /* distance between two previous syncblips */
   int found_name = 0; /* name string found */
+  const char *song_name = NULL;
 
   while (!done)
   {
@@ -474,11 +475,11 @@ int main(int argc, char **argv)
     }
 
     if (!found_name && syncblips == 1 && extract(input, extract_name)) {
-      const char *name = trim_space(extract_name->string);
-      fprintf(stderr, "\nSong name: \"%s\"", name);
+      song_name = trim_space(extract_name->string);
+      fprintf(stderr, "\nSong name: \"%s\"", song_name);
       found_name = 1;
       if (name_only) {
-        printf("%s\n", name);
+        printf("%s\n", song_name);
         done = 1;
       }
     }
