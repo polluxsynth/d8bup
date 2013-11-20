@@ -422,7 +422,10 @@ int main(int argc, char **argv)
   }
 
   if (songname_as_filename)
+  {
     filename = tempfilename;
+    unlink(tempfilename);
+  }
 
   if (filename) {
     output_fd = open(filename, O_CREAT | O_EXCL | O_WRONLY, 
