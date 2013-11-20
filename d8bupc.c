@@ -527,15 +527,6 @@ int main(int argc, char **argv)
         printf("%s\n", songname);
         done = 1;
       }
-      if (songname_as_filename) {
-        filename = make_filename(songname, cut);
-        if (!filename) {
-          fprintf(stderr, "\nCan't create an output file: %s, aborting.", 
-                  strerror(errno));
-          exit(2);
-        }
-        fprintf(stderr, "\nWill use output file name %s", filename);
-      }
     }
 
     if (match(input, syncblip)) { /* Found a syncblip */
@@ -620,8 +611,16 @@ int main(int argc, char **argv)
   flush(output->stream); /* write final bytes */
 
   if (songname_as_filename) {
-    if (rename(tempfilename, filename) < 0)
-      perror("Renaming output file");
+    filename = make_filename(songname, cut);
+    if (!filename) {
+      perror("\nFinding output filename");
+      exit(2);
+    }
+    fprintf(stderr, "\nWill use output file name %s", filename);
+    if (rename(tempfilename, filename) < 0) {
+      perror("\nRenaming output file");
+      exit(2);
+    }
   }
 
   fprintf(stderr, "\nRead %d bytes, wrote %d bytes", input->bytecount, output->bytecount);
