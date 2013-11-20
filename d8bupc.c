@@ -308,14 +308,17 @@ char *make_filename(const char *songname, int cut)
 
   int name_end = strlen(filename);
   int var = 0;
+#define MAX_VARS 10 /* max tries */
 
   /* loop until a unique name found */
   while (1) {
      strcat(filename, ".raw");
      int try_fd = open(filename, O_RDONLY);
-     if (try_fd < 0)
-       break; /* file doesn't exist, so we're happy */
-     close(try_fd);
+     if (try_fd < 0) {
+       if (errno == ENOENT) break; /* file doesn't exist, so we're happy */
+       if (var == MAX_VARS) return NULL; /* some error causes us to spin */
+     } else
+       close(try_fd);
      sprintf(filename + name_end, "-%d", ++var);
   }
 
@@ -526,6 +529,11 @@ int main(int argc, char **argv)
       }
       if (songname_as_filename) {
         filename = make_filename(songname, cut);
+        if (!filename) {
+          fprintf(stderr, "\nCan't create an output file: %s, aborting.", 
+                  strerror(errno));
+          exit(2);
+        }
         fprintf(stderr, "\nWill use output file name %s", filename);
       }
     }
