@@ -384,7 +384,7 @@ int main(int argc, char **argv)
   int stop_on_song_end = 0; /* set for -t only */
   int expand = 0; /* !=0 when -x encountered */
   int cut = 0; /* !=0 when -c encountered */
-  int dont_break_input = 0; /* set for -z mode */
+  int break_input = 1; /* cleared for -z mode */
   int name_only = 0; /* set for -n; output name then exit */
   int songname_as_filename = 0; /* set for -f */
   const char *filename = NULL; /* use specified file name instead of stdout */
@@ -404,7 +404,7 @@ int main(int argc, char **argv)
                   if (xc_rangecheck(&cut, "cut (-c)"))
                     return 1;
                   start_on_sync = 1; break;
-        case 'z': dont_break_input = 1; break;
+        case 'z': break_input = 0; break;
         case 'n': name_only = 1; break;
         case 'o': filename = argv[++argcount]; break;
         case 'f': songname_as_filename = 1; break;
@@ -591,8 +591,12 @@ int main(int argc, char **argv)
 
     if (stop_copying) {
       copying = stop_copying = 0;
-      if (dont_break_input)
-        break; /* don't consume any more input bytes */
+      if (break_input)
+      {
+        fprintf(stderr, "\nStopped copying; breaking input at %s.",
+                        sampletime(input->samplecount));
+        done = 1; /* don't consume any more input bytes */
+      }
     }
   }
 
