@@ -503,7 +503,11 @@ int main(int argc, char **argv)
       return 1;
 
     if (input->eof)
-      break;
+    {
+      fprintf(stderr, "\nReached end of input stream at %s.",
+                       sampletime(input->samplecount));
+      done = 1;
+    }
     
     if (input->samplecount == searchpos)
       start_copying = 1;
@@ -513,7 +517,7 @@ int main(int argc, char **argv)
       synctone_found = 1;
       if (start_on_sync) {
         silence(output, ONE_SECOND);
-        /* restore part of sync tone that will be skipped due to matching */
+        /* restore part of sync tone that would be skipped due to matching */
         output_samples(output, synctone_data, SYNCTONESIZE-1);
         start_copying = 1;
       }
@@ -561,7 +565,7 @@ int main(int argc, char **argv)
       /* The following can only happen after >= 4 sync blips, so we know
        * song_delta has been set. */
       if (cut && syncblips - 3 == cut) {
-        fprintf(stderr, "\nCutting input from %s, stopping output", 
+        fprintf(stderr, "\nCutting input from %s, stopping output.", 
                 sampletime(input->samplecount));
         stop_copying = 1;
       }
@@ -571,7 +575,7 @@ int main(int argc, char **argv)
 
     if (stop_on_song_end && copying && syncblips >= 6 && 
         input->samplecount == blipsample + song_delta) {
-      fprintf(stderr, "\nReached end of song at %s, stopping output",
+      fprintf(stderr, "\nReached end of song at %s, stopping output.",
               sampletime(input->samplecount));
       stop_copying = 1;
     }
