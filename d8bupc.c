@@ -371,6 +371,7 @@ void usage(void)
                   "-z             Don't break input: read input until eof\n"
                   "-n             Output name to stdout, then exit\n"
                   "-o <filename>  Use specified filename instead of stdout\n"
+                  "-C <n>         Skip songs until song n found (n = 1,2,..)\n"
                   "-h             This list\n"
                   "For -x, -c and -t, output an additional one second of "
                   "silence at end of file\n");
@@ -387,6 +388,7 @@ int main(int argc, char **argv)
   int break_input = 1; /* cleared for -z mode */
   int name_only = 0; /* set for -n; output name then exit */
   int songname_as_filename = 0; /* set for -f */
+  int synctone_count = 1; /* which song are we looking for ? */
   const char *filename = NULL; /* use specified file name instead of stdout */
   int output_fd = 1; /* default to stdout */
   
@@ -408,6 +410,12 @@ int main(int argc, char **argv)
         case 'n': name_only = 1; break;
         case 'o': filename = argv[++argcount]; break;
         case 'f': songname_as_filename = 1; break;
+        case 'C': synctone_count = atoi(argv[++argcount]);
+                  if (synctone_count < 1) {
+                    fprintf(stderr, "argument to -C must be >= 1!");
+                    return 1;
+                  }
+                  break;
         case 'h': /* fall through */
 	default: usage(); return 0;
       }
@@ -515,12 +523,13 @@ int main(int argc, char **argv)
     if (!synctone_found && match(input, synctone)) {
       fprintf(stderr, "\nFound synctone at %s", sampletime(input->samplecount));
       synctone_found = 1;
-      if (start_on_sync) {
+      if (synctone_count == 1 && start_on_sync) {
         silence(output, ONE_SECOND);
         /* restore part of sync tone that would be skipped due to matching */
         output_samples(output, synctone_data, SYNCTONESIZE-1);
         start_copying = 1;
-      }
+      } else
+        fprintf(stderr, " (skipping)");
     }
 
     if (!found_name && syncblips == 1 && extract(input, extract_name)) {
@@ -533,7 +542,17 @@ int main(int argc, char **argv)
       }
     }
 
-    if (match(input, syncblip)) { /* Found a syncblip */
+    if (synctone_found && match(input, syncblip)) { /* Found a syncblip */
+      if (synctone_count > 1) {
+        /* Found blip after synctone but still counting songs from input
+         * stream, so decrease our count and skip to next sample. */
+        synctone_count--;
+        synctone_found = 0; /* go back to scanning for sync tone */
+        continue;
+      }
+
+      /* We now have a valid syncblip at the start of the song we want. */
+
       syncblips++;
 
 #if 0 /* trigger on syncblip */
