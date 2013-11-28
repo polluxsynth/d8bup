@@ -10,6 +10,7 @@
 #define SAMPLESIZE 4 /* 2 bytes per sample * 2 channels */
 #define SAMPLERATE 44100
 #define ONE_SECOND SAMPLERATE
+#define TWO_HOURS (SAMPLERATE * 60 * 60 *2) /* a long long time */
 
 #define NAMELEN 16 /* length of D8 name string */
 #define NAME_OFFSET 11 /* #samples from 1. syncblip */
@@ -489,7 +490,7 @@ int main(int argc, char **argv)
   extract_name->string = malloc(NAMELEN + 1);
   extract_name->how = how_name;
   extract_name->skip_first = 1; /* skip 1 byte in first sample */
-  extract_name->start_sample = -1; /* not yet started */
+  extract_name->start_sample = TWO_HOURS; /* not yet started */
 
   int done = 0; /* looping condition */
   int copying = 0; /* copying data from input to output stream */
@@ -532,7 +533,7 @@ int main(int argc, char **argv)
         fprintf(stderr, " (skipping)");
     }
 
-    if (!found_name && syncblips == 1 && extract(input, extract_name)) {
+    if (!found_name && extract(input, extract_name)) {
       songname = trim_space(extract_name->string);
       fprintf(stderr, "\nSong name: \"%s\"", songname);
       found_name = 1;
