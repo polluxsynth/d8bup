@@ -64,15 +64,26 @@ rm $LOGFILE
 echo "Running d8bupc tests" | log_and_print
 echo "First create raw files" | log_and_print
 
-makeraw 12345678.wav passthru.wav truncated.wav expanded.wav
+makeraw 12345678.wav passthru.wav truncated-2.wav expanded-2.wav
+makeraw truncated-4.wav expanded-4.wav truncated-6.wav expanded-6.wav
 
 run_test 1 "pass through using -t" "./d8bupc -t" 0 12345678.raw passthru.raw
-run_test 2 "cut using -c" "./d8bupc -c 2" 0 12345678.raw truncated.raw
+
+run_test 2 "cut using -c 2" "./d8bupc -c 2" 0 12345678.raw truncated-2.raw
 cp result.raw test.raw
-run_test 3 "expand using -x" "./d8bupc -x 2" 0 test.raw expanded.raw
-run_test 4 "extract name using -n" "./d8bupc -n" 0 12345678.raw 12345678.txt
-run_test 5 "write to file" "./d8bupc -t" 1 12345678.raw passthru.raw
-run_test 6 "write to songname" "./d8bupc -t" 2 12345678.raw passthru.raw
+run_test 3 "expand using -x 2" "./d8bupc -x 2" 0 test.raw expanded-2.raw
+
+run_test 4 "cut using -c 4" "./d8bupc -c 4" 0 12345678.raw truncated-4.raw
+cp result.raw test.raw
+run_test 5 "expand using -x 4" "./d8bupc -x 4" 0 test.raw expanded-4.raw
+
+run_test 6 "cut using -c 6" "./d8bupc -c 6" 0 12345678.raw truncated-6.raw
+cp result.raw test.raw
+run_test 7 "expand using -x 6" "./d8bupc -x 6" 0 test.raw expanded-6.raw
+
+run_test 8 "extract name using -n" "./d8bupc -n" 0 12345678.raw 12345678.txt
+run_test 9 "write to file" "./d8bupc -t" 1 12345678.raw passthru.raw
+run_test 10 "write to songname" "./d8bupc -t" 2 12345678.raw passthru.raw
 
 if [ "$FAILED" ]; then
   echo "Something FAILED!" | log_and_print
