@@ -536,10 +536,17 @@ int main(int argc, char **argv)
     if (!found_name && extract(input, extract_name)) {
       songname = trim_space(extract_name->string);
       fprintf(stderr, "\nSong name: \"%s\"", songname);
-      found_name = 1;
-      if (name_only) {
-        printf("%s\n", songname);
-        done = 1;
+      if (synctone_found) { /* a valid song has been found (not skipping) */
+        found_name = 1;
+        if (name_only) {
+          printf("%s\n", songname);
+          done = 1;
+        }
+      } else {
+        fprintf(stderr, " (skipping)");
+        /* restart name extraction */
+        extract_name->start_sample = TWO_HOURS; /* not yet started */
+        extract_name->bytecount = 0; /* restart output */
       }
     }
 
@@ -549,6 +556,8 @@ int main(int argc, char **argv)
          * stream, so decrease our count and skip to next sample. */
         synctone_count--;
         synctone_found = 0; /* go back to scanning for sync tone */
+        /* prepare to extract name, just for reference printout */
+        extract_name->start_sample = input->samplecount + NAME_OFFSET;
         continue;
       }
 
