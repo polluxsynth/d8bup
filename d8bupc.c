@@ -295,6 +295,24 @@ int extract(struct sa_stream *input, struct extractor *extractor)
   return 0;
 }
 
+struct extractor *prepare_extract(struct extractor *extractor, 
+                                  int name_len, const int *how, int skip_first)
+{
+  if (extractor == NULL) { /* first time called */
+    extractor = malloc(sizeof(struct extractor));
+    memset(extractor, sizeof(struct extractor), 0);
+  } else {
+    extractor->bytecount = 0; /* restart output */
+  }
+  extractor->length = name_len;
+  extractor->string = malloc(name_len + 1);
+  extractor->how = how;
+  extractor->skip_first = skip_first;
+  extractor->start_sample = TWO_HOURS; /* not yet started */
+
+  return extractor;
+}
+
 /* Make output file name from song name, considering cut (-c) option */
 char *make_filename(const char *songname, int cut)
 {
@@ -484,13 +502,7 @@ int main(int argc, char **argv)
   synctone->string = synctone_data;
   synctone->matchlen = SYNCTONESIZE * SAMPLESIZE;
 
-  struct extractor *extract_name = malloc(sizeof(struct extractor));
-  memset(extract_name, sizeof(struct extractor), 0);
-  extract_name->length = NAMELEN;
-  extract_name->string = malloc(NAMELEN + 1);
-  extract_name->how = how_name;
-  extract_name->skip_first = 1; /* skip 1 byte in first sample */
-  extract_name->start_sample = TWO_HOURS; /* not yet started */
+  struct extractor *extract_name = prepare_extract(NULL, NAMELEN, how_name, 1);
 
   int done = 0; /* looping condition */
   int copying = 0; /* copying data from input to output stream */
@@ -545,8 +557,7 @@ int main(int argc, char **argv)
       } else {
         fprintf(stderr, " (skipping)");
         /* restart name extraction */
-        extract_name->start_sample = TWO_HOURS; /* not yet started */
-        extract_name->bytecount = 0; /* restart output */
+        extract_name = prepare_extract(extract_name, NAMELEN, how_name, 1);
       }
     }
 
