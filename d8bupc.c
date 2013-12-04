@@ -268,6 +268,13 @@ struct extractor
   char *string;
 };
 
+struct extract_init 
+{
+  int name_len;
+  const int *how;
+  int initial_offset;
+};
+
 int extract(struct sa_stream *input, struct extractor *extractor)
 {
   int byteno;
@@ -296,7 +303,7 @@ int extract(struct sa_stream *input, struct extractor *extractor)
 }
 
 struct extractor *prepare_extract(struct extractor *extractor, 
-                                  int name_len, const int *how, int skip_first)
+                                  struct extract_init *init)
 {
   if (extractor == NULL) { /* first time called */
     extractor = malloc(sizeof(struct extractor));
@@ -304,10 +311,10 @@ struct extractor *prepare_extract(struct extractor *extractor,
   } else {
     extractor->bytecount = 0; /* restart output */
   }
-  extractor->length = name_len;
-  extractor->string = malloc(name_len + 1);
-  extractor->how = how;
-  extractor->skip_first = skip_first;
+  extractor->length = init->name_len;
+  extractor->string = malloc(extractor->length + 1);
+  extractor->how = init->how;
+  extractor->skip_first = init->initial_offset;
   extractor->start_sample = TWO_HOURS; /* not yet started */
 
   return extractor;
@@ -502,7 +509,11 @@ int main(int argc, char **argv)
   synctone->string = synctone_data;
   synctone->matchlen = SYNCTONESIZE * SAMPLESIZE;
 
-  struct extractor *extract_name = prepare_extract(NULL, NAMELEN, how_name, 1);
+  struct extract_init name_init = {
+    .name_len = NAMELEN,
+    .how = how_name,
+    .initial_offset = 1 };
+  struct extractor *extract_name = prepare_extract(NULL, &name_init);
 
   int done = 0; /* looping condition */
   int copying = 0; /* copying data from input to output stream */
@@ -557,7 +568,7 @@ int main(int argc, char **argv)
       } else {
         fprintf(stderr, " (skipping)");
         /* restart name extraction */
-        extract_name = prepare_extract(extract_name, NAMELEN, how_name, 1);
+        extract_name = prepare_extract(extract_name, &name_init);
       }
     }
 
