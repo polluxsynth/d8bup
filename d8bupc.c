@@ -32,6 +32,8 @@ static const char synctone_data[] = "\x00\x00\x00\x00"
                                     "\x00\x10\x00\x10"
                                     "\x00\x10\x00\x10";
 
+static const char quiet_sample[4] = "\0\0\0"; /* 4 bytes of zeros */
+
 /* Scheme for how to extract name: for each stereo sample of 4
  * (i.e. SAMPLESIZE) bytes, extract byte #1 and byte #0 (i.e.
  * left channel, byte swapped), then wait for next sample */
@@ -222,10 +224,8 @@ int output_samples(struct sa_stream *sa_stream, const char *buf, int samples)
   
 int silence(struct sa_stream *sa_stream, int samples)
 {
-  const char quiet[4] = "\0\0\0"; /* 4 bytes of zeros */
-
   while (samples--) {
-    output_samples(sa_stream, quiet, 1);
+    output_samples(sa_stream, quiet_sample, 1);
   }
 }
 
@@ -256,6 +256,13 @@ int match(struct sa_stream *sa_stream, struct match *what)
   }
 
   return 0; /* no match */
+}
+
+int is_quiet(struct sa_stream *sa_stream)
+{
+  if (memcmp(sa_stream->buf, quiet_sample, SAMPLESIZE) == 0)
+    return 1;
+  return 0;
 }
 
 struct extractor
@@ -398,6 +405,8 @@ void usage(void)
                   "-n             Output name to stdout, then exit\n"
                   "-o <filename>  Use specified filename instead of stdout\n"
                   "-C <n>         Skip songs until song n found (n = 1,2,..)\n"
+                  "-S             Start when any input sample != 0\n"
+                  "-E             End when 1s of silence detected\n"
                   "-h             This list\n"
                   "For -x, -c and -t, output an additional one second of "
                   "silence at end of file\n");
@@ -415,6 +424,8 @@ int main(int argc, char **argv)
   int name_only = 0; /* set for -n; output name then exit */
   int songname_as_filename = 0; /* set for -f */
   int synctone_count = 1; /* which song are we looking for ? */
+  int start_on_sound = 0; /* start output when input samples are != 0 */
+  int stop_on_silence = 0; /* terminate output when 1s of 0 samples received */
   const char *filename = NULL; /* use specified file name instead of stdout */
   int output_fd = 1; /* default to stdout */
   
@@ -442,6 +453,8 @@ int main(int argc, char **argv)
                     return 1;
                   }
                   break;
+        case 'S': start_on_sound = 1; break;
+        case 'E': stop_on_silence = 1; break;
         case 'h': /* fall through */
 	default: usage(); return 0;
       }
@@ -509,6 +522,13 @@ int main(int argc, char **argv)
   synctone->string = synctone_data;
   synctone->matchlen = SYNCTONESIZE * SAMPLESIZE;
 
+  struct match *quiet = malloc(sizeof(struct match));
+  memset(quiet, sizeof(struct match), 0);
+  char *quiet_data = malloc(ONE_SECOND * SAMPLESIZE);
+  memset(quiet_data, 0, ONE_SECOND * SAMPLESIZE); /* create silence */
+  quiet->string = quiet_data;
+  quiet->matchlen = ONE_SECOND * SAMPLESIZE;
+
   struct extract_init name_init = {
     .name_len = NAMELEN,
     .how = how_name,
@@ -543,6 +563,12 @@ int main(int argc, char **argv)
     
     if (input->samplecount == searchpos)
       start_copying = 1;
+
+    if (!copying && start_on_sound && !is_quiet(input)) {
+      fprintf(stderr, "\nFound nonzero sample at %s, copying to output",
+              sampletime(input->samplecount));
+      start_copying = 1;
+    }
 
     if (!synctone_found && match(input, synctone)) {
       fprintf(stderr, "\nFound synctone at %s", sampletime(input->samplecount));
@@ -631,6 +657,12 @@ int main(int argc, char **argv)
       stop_copying = 1;
     }
 
+    if (stop_on_silence && copying && match(input, quiet)) {
+      fprintf(stderr, "\nFound 1s of silence at %s, stopping output.",
+              sampletime(input->samplecount));
+      stop_copying = 1;
+    }
+
     if (start_copying && !copying) {
       fprintf(stderr, "\nCopying to output from %s", sampletime(input->samplecount));
       copying = 1;
@@ -684,7 +716,8 @@ int main(int argc, char **argv)
 
   fprintf(stderr, "\nRead %d bytes, wrote %d bytes", input->bytecount, output->bytecount);
   fprintf(stderr, "\nRead %d samples, wrote %d samples", input->samplecount, output->samplecount);
-  fprintf(stderr, "\nSong length is %s", sampletime(song_delta));
+  if (song_delta)
+    fprintf(stderr, "\nSong length is %s", sampletime(song_delta));
 
 exit_ok:
   fprintf(stderr, "\n");
