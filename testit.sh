@@ -66,6 +66,7 @@ echo "First create raw files" | log_and_print
 
 makeraw 12345678.wav 23456789.wav passthru.wav truncated-2.wav expanded-2.wav
 makeraw truncated-4.wav expanded-4.wav truncated-6.wav expanded-6.wav
+makeraw se-options.wav
 
 run_test 1 "pass through using -t" "./d8bupc -t" 0 12345678.raw passthru.raw
 
@@ -90,6 +91,14 @@ run_test 11 "extract using -C 1" "./d8bupc -t -C 1" 0 combined.raw passthru.raw
 
 cat 23456789.raw 12345678.raw > combined.raw
 run_test 12 "extract using -C 2" "./d8bupc -t -C 2" 0 combined.raw passthru.raw
+
+# -S -E is normally used on mixdowns, but since it delimits a file based on
+# silence (zero bytes) we can use it on a backup file for test purposes.
+# In this case, since the file starts with ordinary audio, with a slight
+# amount of nice, the output will start from the same sample as the input.
+# The output then ends with the pause after the initial (including name)
+# data burst.
+run_test 13 "-S -E options" "./d8bupc -S -E" 0 12345678.raw se-options.raw
 
 if [ "$FAILED" ]; then
   echo "Something FAILED!" | log_and_print

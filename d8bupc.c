@@ -686,14 +686,18 @@ int main(int argc, char **argv)
   if (name_only)
     goto exit_ok;
 
-  if (expand) expand = 4 - expand; /* output 3, 2 or 1 segment(s) of silence */
-  while (expand--) {
-    fprintf(stderr, "\nOutputting %s of silence", sampletime(song_delta));
-    silence(output, song_delta);
-    if (expand) { /* don't output blip after last expansion */
-      fprintf(stderr, "\nOutputting sync blip");
-      output_samples(output, syncblip_data, SYNCBLIPSIZE);
+  if (expand) {
+    expand = 4 - expand; /* output 3, 2 or 1 segment(s) of silence */
+    while (expand--) {
+      fprintf(stderr, "\nOutputting %s of silence", sampletime(song_delta));
+      silence(output, song_delta);
+      if (expand) { /* don't output blip after last expansion */
+        fprintf(stderr, "\nOutputting sync blip");
+        output_samples(output, syncblip_data, SYNCBLIPSIZE);
+      }
     }
+    /* expand will now be -1, which is ok, as we only use it as a boolean
+     * below. */
   }
 
   if (expand || cut || stop_on_song_end)
