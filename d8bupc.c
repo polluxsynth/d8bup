@@ -61,6 +61,15 @@ struct sa_stream
 
 /* stream functions */
 
+struct stream *stream_init(int fd, int chunksize)
+{
+  struct stream *stream = malloc(sizeof(struct stream));
+  memset(stream, sizeof(struct stream), 0);
+  stream->fd = fd;
+  stream->buf = malloc(chunksize);
+  return stream;
+}
+
 /* Read chunk to a struct stream */
 int read_chunk(struct stream *stream)
 {
@@ -168,6 +177,15 @@ char *sampletime(int samples)
 
 /* sample stream (sa_stream) functions */
 
+struct sa_stream* sa_stream_init(void *buf, struct stream *stream)
+{
+  struct sa_stream *sa_stream = malloc(sizeof(struct sa_stream));
+  memset(sa_stream, sizeof(struct sa_stream), 0);
+  sa_stream->buf = buf;
+  sa_stream->stream = stream;
+  return sa_stream;
+}
+
 int read_sample(struct sa_stream *sa_stream)
 {
   int res;
@@ -236,6 +254,15 @@ struct match
   int matchpoint; /* next point to match */
   int matchsample; /* which sample is at the start of the match */
 };
+
+struct match *match_init(const void *match_data, int match_len)
+{
+  struct match *match = malloc(sizeof(struct match));
+  memset(match, sizeof(struct match), 0);
+  match->string = match_data;
+  match->matchlen = match_len;
+  return match;
+}
 
 int match(struct sa_stream *sa_stream, struct match *what)
 {
@@ -309,8 +336,8 @@ int extract(struct sa_stream *input, struct extractor *extractor)
   return 0;
 }
 
-struct extractor *prepare_extract(struct extractor *extractor, 
-                                  struct extract_init *init)
+struct extractor *extract_init(struct extractor *extractor, 
+                               struct extract_init *init)
 {
   if (extractor == NULL) { /* first time called */
     extractor = malloc(sizeof(struct extractor));
@@ -486,54 +513,27 @@ int main(int argc, char **argv)
     }
   }
 
-  struct stream *input_low, *output_low;
+  struct stream *input_low = stream_init(0 /* stdin */, CHUNKSIZE);
+  struct stream *output_low = stream_init(output_fd, CHUNKSIZE);
 
-  input_low = malloc(sizeof(struct stream));
-  memset(input_low, sizeof(struct stream), 0);
-  input_low->fd = 0; /* stdin */
-  input_low->buf = malloc(CHUNKSIZE);
+  void *sa_stream_buf = malloc(SAMPLESIZE);
+  struct sa_stream *input = sa_stream_init(sa_stream_buf, input_low);
+  /* Use same buf for output as input to avoid copying */
+  struct sa_stream *output = sa_stream_init(sa_stream_buf, output_low);
 
-  output_low = malloc(sizeof(struct stream));
-  memset(output_low, sizeof(struct stream), 0);
-  output_low->fd = output_fd; /* default stdout */
-  output_low->buf = malloc(CHUNKSIZE);
+  struct match *syncblip = match_init(syncblip_data, strlen(syncblip_data));
 
-  struct sa_stream *input, *output;
+  struct match *synctone = match_init(synctone_data, SYNCTONESIZE * SAMPLESIZE);
 
-  input = malloc(sizeof(struct sa_stream));
-  memset(input, sizeof(struct sa_stream), 0);
-
-  input->buf = malloc(SAMPLESIZE);
-  input->stream = input_low;
-
-  output = malloc(sizeof(struct sa_stream));
-  memset(output, sizeof(struct sa_stream), 0);
-
-  output->buf = input->buf;
-  output->stream = output_low;
-
-  struct match *syncblip = malloc(sizeof(struct match));
-  memset(syncblip, sizeof(struct match), 0);
-  syncblip->string = syncblip_data;
-  syncblip->matchlen = strlen(syncblip_data);
-
-  struct match *synctone = malloc(sizeof(struct match));
-  memset(synctone, sizeof(struct match), 0);
-  synctone->string = synctone_data;
-  synctone->matchlen = SYNCTONESIZE * SAMPLESIZE;
-
-  struct match *quiet = malloc(sizeof(struct match));
-  memset(quiet, sizeof(struct match), 0);
   char *quiet_data = malloc(ONE_SECOND * SAMPLESIZE);
   memset(quiet_data, 0, ONE_SECOND * SAMPLESIZE); /* create silence */
-  quiet->string = quiet_data;
-  quiet->matchlen = ONE_SECOND * SAMPLESIZE;
+  struct match *quiet = match_init(quiet_data, ONE_SECOND * SAMPLESIZE);
 
   struct extract_init name_init = {
     .name_len = NAMELEN,
     .how = how_name,
     .initial_offset = 1 };
-  struct extractor *extract_name = prepare_extract(NULL, &name_init);
+  struct extractor *extract_name = extract_init(NULL, &name_init);
 
   int done = 0; /* looping condition */
   int copying = 0; /* copying data from input to output stream */
@@ -594,7 +594,7 @@ int main(int argc, char **argv)
       } else {
         fprintf(stderr, " (skipping)");
         /* restart name extraction */
-        extract_name = prepare_extract(extract_name, &name_init);
+        extract_name = extract_init(extract_name, &name_init);
       }
     }
 
