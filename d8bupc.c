@@ -1,3 +1,12 @@
+/*
+ * d8bupc.c
+ * Process Korg D8 backup files.
+ * Also chop silence from mixdown files.
+ *
+ * Released under the GNU GPL.
+ * Copyright (C) 2013 Ricard Wanderlof.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -247,6 +256,8 @@ int silence(struct sa_stream *sa_stream, int samples)
   }
 }
 
+/* match functions */
+
 struct match
 {
   const char *string;
@@ -285,12 +296,16 @@ int match(struct sa_stream *sa_stream, struct match *what)
   return 0; /* no match */
 }
 
+/* Simple matching function for checking if the current sample is silence (0) */
+
 int is_quiet(struct sa_stream *sa_stream)
 {
   if (memcmp(sa_stream->buf, quiet_sample, SAMPLESIZE) == 0)
     return 1;
   return 0;
 }
+
+/* extract functions */
 
 struct extractor
 {
@@ -385,7 +400,7 @@ char *make_filename(const char *songname, int cut)
   return filename;
 }
 
-/* trim spaces from end of string */
+/* trim spaces from start and end of string */
 char *trim_space(char *s)
 {
   int len = strlen(s);
@@ -407,6 +422,7 @@ char *trim_space(char *s)
   return s;
 }
 
+/* Check range of arguments for -x and -c options. */
 int xc_rangecheck(int *arg, const char *what)
 {
   int val = *arg;
@@ -529,6 +545,9 @@ int main(int argc, char **argv)
   memset(quiet_data, 0, ONE_SECOND * SAMPLESIZE); /* create silence */
   struct match *quiet = match_init(quiet_data, ONE_SECOND * SAMPLESIZE);
 
+  /* We use a struct for this so that we can reinitialize the extractor
+   * for each name we find (when scanning multiple backups).
+   */
   struct extract_init name_init = {
     .name_len = NAMELEN,
     .how = how_name,
