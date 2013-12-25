@@ -11,6 +11,7 @@ log() {
   cat >> $LOGFILE
 }
 
+# Not used, moved to makefile
 makeraw() {
   for filename in $*; do
     infile=$filename
@@ -59,14 +60,10 @@ run_test() {
 }
 
 LOGFILE=d8bup.log
-rm $LOGFILE
+[ "$1" = "" ] || LOGFILE=$1
+rm -f $LOGFILE
 
 echo "Running d8bupc tests" | log_and_print
-echo "First create raw files" | log_and_print
-
-makeraw 12345678.wav 23456789.wav passthru.wav truncated-2.wav expanded-2.wav
-makeraw truncated-4.wav expanded-4.wav truncated-6.wav expanded-6.wav
-makeraw se-options.wav
 
 run_test 1 "pass through using -t" "./d8bupc -t" 0 12345678.raw passthru.raw
 
