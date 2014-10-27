@@ -1,0 +1,5 @@
+*.o
+d8bup
+*.swp
+*.raw
+*.log
