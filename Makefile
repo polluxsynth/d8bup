@@ -1,6 +1,6 @@
 # Makefile for d8bup
 
-BINARIES = d8bupc
+BINARIES = d8bup
 
 TESTFILES = 12345678.raw 23456789.raw passthru.raw 
 TESTFILES += truncated-2.raw expanded-2.raw 
@@ -16,10 +16,10 @@ LOGFILE = d8bup.log
 %.raw: %.wav
 	sox $< $(SAMPLEPARAMS) -t raw $@
 
-all: $(BINARIES) $(TESTFILES) test
+all: test
 
 .PHONY : test
-test:
+test: $(TESTFILES) $(BINARIES)
 	@sh testit.sh $(LOGFILE)
 
 clean:
